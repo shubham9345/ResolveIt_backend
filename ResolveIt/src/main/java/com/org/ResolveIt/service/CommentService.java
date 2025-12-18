@@ -11,6 +11,7 @@ import com.org.ResolveIt.repository.UserInfoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.swing.text.html.Option;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -22,10 +23,14 @@ public class CommentService {
     private ComplaintsRepository complaintsRepository;
     @Autowired
     private UserInfoRepository userInfoRepository;
+    @Autowired
+    private EmailService emailService;
 
     public String addCommentByComplaintId(Long complaintId, Long UserId, String desc, StatusType statusType) {
         Optional<Complaints> complaints = complaintsRepository.findById(complaintId);
         Optional<UserInfo> userInfo = userInfoRepository.findById(UserId);
+        Optional<UserInfo> senderInfo = userInfoRepository.findById(complaints.get().getUserId());
+
         if (userInfo.isEmpty()) {
             throw new UserNotFoundException("user is not present with given userId", "user is not present with given userId");
         }
@@ -45,6 +50,7 @@ public class CommentService {
             complaints.get().setStatusType(statusType);
             commentRepository.save(comment);
             complaintsRepository.save(complaints.get());
+            emailService.sendComplaintStatusMail(senderInfo.get().getEmail(),complaints.get().getDescription(),statusType);
         }
         return "comment is successfully added to the complaintsId";
     }

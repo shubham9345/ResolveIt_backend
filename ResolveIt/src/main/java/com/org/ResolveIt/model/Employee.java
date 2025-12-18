@@ -4,14 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Setter
-@Getter
 public class Employee {
     @Id
     private Long id;
@@ -25,4 +24,6 @@ public class Employee {
     @MapsId
     @JoinColumn(name = "employee_id")
     private UserInfo user;
+    @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY)
+    private List<CommentEmployee> commentEmployeeList = new ArrayList<>();
 }

@@ -1,5 +1,5 @@
 package com.org.ResolveIt.model;
 
 public enum StatusType {
-    Open, InProgress, Resolved ,PENDING
+    Open, InProgress, Resolved ,PENDING,Escalated
 }

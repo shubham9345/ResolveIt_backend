@@ -21,6 +21,7 @@ public class Complaints {
     @Enumerated(EnumType.STRING)
     private CategoryType categoryType;
     @Enumerated(EnumType.STRING)
+    @Column(name = "status_type", length = 50)
     private StatusType statusType;
     private String description;
     @Enumerated(EnumType.STRING)
@@ -32,9 +33,11 @@ public class Complaints {
     private String attachedUrl;
     @OneToMany(mappedBy = "complaint", cascade = CascadeType.ALL)
     private List<Comment> comments = new ArrayList<>();
+    @OneToMany(mappedBy = "complaintEmployee", cascade = CascadeType.ALL)
+    @JsonIgnore
+    private List<CommentEmployee> commentsEmployee = new ArrayList<>();
     @ManyToOne
     @JoinColumn(name = "employee_id")
     @JsonIgnore
     private Employee assignedEmployee;
-
 }

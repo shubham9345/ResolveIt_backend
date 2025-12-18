@@ -81,7 +81,7 @@ public class AuthController {
 
         UserInfo userDetails = userInfoRepository.findByUsername(request.getUsername());
         String token = this.jwtUtil.generateToken(userDetails.getUsername(), userDetails.getId());
-        JwtResponse response = new JwtResponse(token);
+        JwtResponse response = new JwtResponse(token,userDetails.getRoles());
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 

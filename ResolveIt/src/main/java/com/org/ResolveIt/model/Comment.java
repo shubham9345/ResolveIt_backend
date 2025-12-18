@@ -10,8 +10,6 @@ import java.time.LocalDate;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Setter
-@Getter
 @Table(name = "comments")
 public class Comment {
     @Id
@@ -25,5 +23,6 @@ public class Comment {
     private Complaints complaint;
     private Long userId;
     @Enumerated(EnumType.STRING)
+    @Column(name = "status_type", length = 50)
     private StatusType statusType;
 }

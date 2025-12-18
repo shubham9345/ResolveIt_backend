@@ -1,12 +1,18 @@
 package com.org.ResolveIt.controller;
 
+import com.org.ResolveIt.model.CategoryType;
 import com.org.ResolveIt.model.Complaints;
+import com.org.ResolveIt.model.Employee;
+import com.org.ResolveIt.model.StatusType;
 import com.org.ResolveIt.service.ComplaintsService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -36,4 +42,29 @@ public class ComplaintsController {
     public List<Complaints> allanonymousComplaints() {
         return complaintsService.allAnonymousComplaints();
     }
+
+    @GetMapping("/complaint-category")
+    public List<Complaints> allEmployeeByCategoryType(@RequestParam CategoryType categoryType) {
+        return complaintsService.getCategoryType(categoryType);
+    }
+
+    @PostMapping("/escalate-complaint/{complaintId}")
+    public String escalationComplaint(@PathVariable Long complaintId, @RequestParam StatusType statusType) {
+        return complaintsService.complaintEscalation(complaintId, statusType);
+    }
+
+    @GetMapping("/filter-complaints")
+    public List<Complaints> ComplaintsFilter(@RequestParam(required = true) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType) {
+        return complaintsService.ComplaintsByFilter(startDate, endDate, statusType, categoryType);
+    }
+
+    @GetMapping("/export/csv")
+    public void exportCsv(HttpServletResponse response, @RequestParam(required = true) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType, @RequestParam String exportType) throws Exception {
+        if (exportType.equals("csv")) {
+            complaintsService.exportToCsv(response, startDate, endDate, statusType, categoryType);
+        } else{
+            complaintsService.exportToPdf(response,startDate,endDate,statusType,categoryType);
+        }
+    }
 }
+
