@@ -1,15 +1,14 @@
 package com.org.ResolveIt.controller;
 
-import com.org.ResolveIt.model.CategoryType;
-import com.org.ResolveIt.model.Complaints;
-import com.org.ResolveIt.model.Employee;
-import com.org.ResolveIt.model.StatusType;
+import com.org.ResolveIt.model.*;
 import com.org.ResolveIt.service.ComplaintsService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -27,6 +26,7 @@ public class ComplaintsController {
         Complaints complaint = complaintsService.addComplaint(complaints);
         return new ResponseEntity<>(complaint, HttpStatus.OK);
     }
+
 
     @GetMapping("/all-complaints")
     public List<Complaints> allComplaints() {
@@ -54,16 +54,21 @@ public class ComplaintsController {
     }
 
     @GetMapping("/filter-complaints")
-    public List<Complaints> ComplaintsFilter(@RequestParam(required = true) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType) {
-        return complaintsService.ComplaintsByFilter(startDate, endDate, statusType, categoryType);
+    public List<Complaints> ComplaintsFilter(@RequestParam(required = false) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType,@RequestParam(required = false) UrgencyType urgencyType) {
+        return complaintsService.ComplaintsByFilter(startDate, endDate, statusType, categoryType,urgencyType);
+    }
+
+    @GetMapping("/filter-complaints-assigned")
+    public List<Complaints> ComplaintsFilterByAssigned(@RequestParam(required = false) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType, @RequestParam(required = false) UrgencyType urgencyType,@RequestParam(required = false) boolean isAssigned) {
+        return complaintsService.complaintsByFilterAssigned(startDate, endDate, statusType, categoryType,urgencyType,isAssigned);
     }
 
     @GetMapping("/export/csv")
-    public void exportCsv(HttpServletResponse response, @RequestParam(required = true) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType, @RequestParam String exportType) throws Exception {
+    public void exportCsv(HttpServletResponse response, @RequestParam(required = false) LocalDate startDate, @RequestParam(required = false) LocalDate endDate, @RequestParam(required = false) CategoryType categoryType, @RequestParam(required = false) StatusType statusType, @RequestParam String exportType,@RequestParam(required = false) UrgencyType urgencyType) throws Exception {
         if (exportType.equals("csv")) {
-            complaintsService.exportToCsv(response, startDate, endDate, statusType, categoryType);
+            complaintsService.exportToCsv(response, startDate, endDate, statusType, categoryType,urgencyType);
         } else{
-            complaintsService.exportToPdf(response,startDate,endDate,statusType,categoryType);
+            complaintsService.exportToPdf(response,startDate,endDate,statusType,categoryType,urgencyType);
         }
     }
 }

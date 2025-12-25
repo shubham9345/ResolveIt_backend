@@ -23,6 +23,7 @@ public class Complaints {
     @Enumerated(EnumType.STRING)
     @Column(name = "status_type", length = 50)
     private StatusType statusType;
+    @Column(name = "description", length = 8000)
     private String description;
     @Enumerated(EnumType.STRING)
     private UrgencyType urgencyType;
@@ -31,6 +32,7 @@ public class Complaints {
     private LocalDate updatedAt;
     private Long userId;
     private String attachedUrl;
+    private boolean isAssigned;
     @OneToMany(mappedBy = "complaint", cascade = CascadeType.ALL)
     private List<Comment> comments = new ArrayList<>();
     @OneToMany(mappedBy = "complaintEmployee", cascade = CascadeType.ALL)

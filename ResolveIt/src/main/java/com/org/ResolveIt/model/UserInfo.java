@@ -24,6 +24,7 @@ public class UserInfo {
     private String password;
     private LocalDate createdAt;
     private String roles;
+    private String provider;
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonIgnore
     private Employee employee;

@@ -25,10 +25,14 @@ public class EmployeeService {
     @Autowired
     private CommentEmployeeRepository commentEmployeeRepository;
 
+    @Transactional
     public Employee addEmployeeByUserId(Employee employee, Long userId) {
         Optional<UserInfo> userInfo = userInfoRepository.findById(userId);
         if (userInfo.isEmpty()) {
             throw new UserNotFoundException("user not found with this UserId", "user not found with this userId");
+        }
+        if (employeeRepository.existsById(userId)) {
+            throw new IllegalStateException("Employee already exists for this user");
         }
         userInfo.get().setRoles("EMPLOYEE");
         employee.setUser(userInfo.get());
@@ -67,6 +71,7 @@ public class EmployeeService {
 
 
         complaint.setAssignedEmployee(employee);
+        complaint.setAssigned(true);
 
         employee.getAllComplaints().add(complaint);
 
@@ -110,9 +115,10 @@ public class EmployeeService {
         commentEmployeeRepository.save(commentEmployee);
         return "Comment added successfully!!";
     }
-    public List<CommentEmployee> allCommentToEmployee(Long empId){
+
+    public List<CommentEmployee> allCommentToEmployee(Long empId) {
         Optional<Employee> employee = employeeRepository.findById(empId);
-        if(employee.isEmpty()){
+        if (employee.isEmpty()) {
             throw new UserNotFoundException("empId does not exist", "employee is not found with this empId");
         }
         return employee.get().getCommentEmployeeList();

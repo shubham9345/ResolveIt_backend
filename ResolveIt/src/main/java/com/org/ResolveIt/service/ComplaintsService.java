@@ -1,10 +1,10 @@
 package com.org.ResolveIt.service;
 
-import com.org.ResolveIt.Exception.UserNotFoundException;
 import com.org.ResolveIt.model.*;
 import com.org.ResolveIt.repository.CommentRepository;
 import com.org.ResolveIt.repository.ComplaintsRepository;
 import com.org.ResolveIt.repository.UserInfoRepository;
+import com.org.ResolveIt.utils.ConstantUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import org.openpdf.text.*;
 import org.openpdf.text.pdf.PdfPTable;
@@ -15,12 +15,13 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 
 @Service
 public class ComplaintsService {
@@ -32,6 +33,8 @@ public class ComplaintsService {
     private UserInfoRepository userInfoRepository;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private FileStorageService fileStorageService;
 
     public Complaints addComplaint(Complaints complaints) {
 
@@ -47,13 +50,8 @@ public class ComplaintsService {
         comment.setComplaint(complaints);
         complaints.getComments().add(comment);
 
-        if (complaints.isAnonymous()) {
-            complaints.setUserId(null);
-        }
-
         return complaintsRepository.save(complaints);
     }
-
 
     public List<Complaints> allComplaint() {
         List<Complaints> complaintsList = complaintsRepository.findAll();
@@ -78,7 +76,23 @@ public class ComplaintsService {
     }
 
     public List<Complaints> getCategoryType(CategoryType categoryType) {
-        return complaintsRepository.findByCategoryType(categoryType);
+        List<Complaints> allComplaints = complaintsRepository.findByCategoryType(categoryType);
+        for (Complaints comp : allComplaints) {
+            if (comp.getStatusType() == StatusType.Resolved) {
+                continue;
+            }
+            if (comp.getStatusType() == StatusType.Escalated) {
+                continue;
+            }
+            LocalDate createdDate = comp.getCreatedAt(); // assuming LocalDate
+            long noOfDays = ChronoUnit.DAYS.between(createdDate, LocalDate.now());
+            if (noOfDays >= 5) {
+                comp.setStatusType(StatusType.Escalated);
+            }
+            complaintsRepository.save(comp);
+        }
+        return allComplaints;
+
     }
 
     public String complaintEscalation(Long complaintId, StatusType statusType) {
@@ -94,12 +108,6 @@ public class ComplaintsService {
 
         LocalDate createdDate = complaint.getCreatedAt(); // assuming LocalDate
         long noOfDays = ChronoUnit.DAYS.between(createdDate, LocalDate.now());
-
-        if (noOfDays < 7) {
-            throw new IllegalStateException(
-                    "Complaint must be at least 7 days old for escalation"
-            );
-        }
 
         complaint.setStatusType(statusType);
         complaintsRepository.save(complaint);
@@ -124,7 +132,8 @@ public class ComplaintsService {
             LocalDate startDate,
             LocalDate endDate,
             StatusType statusType,
-            CategoryType categoryType
+            CategoryType categoryType,
+            UrgencyType urgencyType
     ) {
         List<Complaints> complaintsList = complaintsRepository.findAll();
         List<Complaints> result = new ArrayList<>();
@@ -148,6 +157,10 @@ public class ComplaintsService {
                     comp.getCategoryType() != categoryType) {
                 continue;
             }
+            if (urgencyType != null &&
+                    comp.getUrgencyType() != urgencyType) {
+                continue;
+            }
 
             //  Status filter
             if (statusType != null &&
@@ -161,7 +174,70 @@ public class ComplaintsService {
         return result;
     }
 
-    public void exportToCsv(HttpServletResponse response,LocalDate startDate,LocalDate endDate,StatusType statusType,CategoryType categoryType) throws IOException {
+    public List<Complaints> complaintsByFilterAssigned(
+            LocalDate startDate,
+            LocalDate endDate,
+            StatusType statusType,
+            CategoryType categoryType,
+            UrgencyType urgencyType,
+            boolean isAssigned
+    ) {
+
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        List<Complaints> result = new ArrayList<>();
+        List<Complaints> complaintsList = complaintsRepository.findAll();
+
+        for (Complaints comp : complaintsList) {
+
+            // Assigned / Non-assigned filter
+
+            if (comp.isAssigned() != isAssigned) {
+                continue;
+            }
+
+            LocalDate createdAt = comp.getCreatedAt();
+
+            // Date filter
+            if (startDate != null &&
+                    (createdAt.isBefore(startDate) || createdAt.isAfter(endDate))) {
+                continue;
+            }
+
+            // Category filter
+            if (categoryType != null &&
+                    comp.getCategoryType() != categoryType) {
+                continue;
+            }
+
+            // Status filter
+            if (statusType != null &&
+                    comp.getStatusType() != statusType) {
+                continue;
+            }
+
+            if (urgencyType != null &&
+                    comp.getUrgencyType() != urgencyType) {
+                continue;
+            }
+
+            result.add(comp);
+        }
+
+        return result;
+    }
+
+
+    public void exportToCsv(
+            HttpServletResponse response,
+            LocalDate startDate,
+            LocalDate endDate,
+            StatusType statusType,
+            CategoryType categoryType,
+            UrgencyType urgencyType
+    ) throws IOException {
 
         response.setContentType("text/csv");
         response.setHeader(
@@ -169,48 +245,183 @@ public class ComplaintsService {
                 "attachment; filename=complaints.csv"
         );
 
-        List<Complaints> complaints = ComplaintsByFilter(startDate,endDate,statusType,categoryType);
+        List<Complaints> complaints =
+                ComplaintsByFilter(startDate, endDate, statusType, categoryType, urgencyType);
 
         PrintWriter writer = response.getWriter();
 
-        // CSV HEADER
+        // ===== REPORT TITLE =====
+        writer.println("Complaints Report");
+        writer.println();
+
+        // ===== SUMMARY: CATEGORY =====
+        writer.println("Summary - Complaints by Category");
+        writer.println("Category,Count");
+
+        Map<CategoryType, Long> categoryCount =
+                complaints.stream()
+                        .collect(Collectors.groupingBy(
+                                Complaints::getCategoryType,
+                                Collectors.counting()
+                        ));
+
+        for (Map.Entry<CategoryType, Long> entry : categoryCount.entrySet()) {
+            writer.println(entry.getKey() + "," + entry.getValue());
+        }
+
+        writer.println();
+
+        // ===== SUMMARY: URGENCY =====
+        writer.println("Summary - Complaints by Urgency");
+        writer.println("Urgency,Count");
+
+        Map<UrgencyType, Long> urgencyCount =
+                complaints.stream()
+                        .collect(Collectors.groupingBy(
+                                Complaints::getUrgencyType,
+                                Collectors.counting()
+                        ));
+
+        for (Map.Entry<UrgencyType, Long> entry : urgencyCount.entrySet()) {
+            writer.println(entry.getKey() + "," + entry.getValue());
+        }
+
+        writer.println();
+
+        // ===== SUMMARY: STATUS =====
+        writer.println("Summary - Complaints by Status");
+        writer.println("Status,Count");
+
+        Map<StatusType, Long> statusCount =
+                complaints.stream()
+                        .collect(Collectors.groupingBy(
+                                Complaints::getStatusType,
+                                Collectors.counting()
+                        ));
+
+        for (Map.Entry<StatusType, Long> entry : statusCount.entrySet()) {
+            writer.println(entry.getKey() + "," + entry.getValue());
+        }
+
+        writer.println();
+
+        // ===== COMPLAINTS TABLE =====
+        writer.println("Complaints List");
         writer.println("ComplaintId,Category,Status,Description,Urgency,CreatedAt,UserId");
 
-        // CSV DATA
         for (Complaints c : complaints) {
             writer.println(
                     c.getComplaintsId() + "," +
                             c.getCategoryType() + "," +
                             c.getStatusType() + "," +
-                            "\"" + c.getDescription() + "\"," +
+                            "\"" + c.getDescription().replace("\"", "\"\"") + "\"," +
                             c.getUrgencyType() + "," +
                             c.getCreatedAt() + "," +
                             c.getUserId()
-
             );
         }
 
         writer.flush();
         writer.close();
     }
-    public void exportToPdf(HttpServletResponse response,LocalDate startDate,LocalDate endDate,StatusType statusType,CategoryType categoryType) throws Exception {
+
+
+    public void exportToPdf(
+            HttpServletResponse response,
+            LocalDate startDate,
+            LocalDate endDate,
+            StatusType statusType,
+            CategoryType categoryType,
+            UrgencyType urgencyType
+    ) throws Exception {
 
         response.setContentType("application/pdf");
         response.setHeader(
                 "Content-Disposition",
-                "attachment; filename=complaints.pdf"
+                "attachment; filename=complaints_report.pdf"
         );
 
         Document document = new Document(PageSize.A4);
         PdfWriter.getInstance(document, response.getOutputStream());
-
         document.open();
 
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-        Paragraph title = new Paragraph("Complaints Report", titleFont);
+        // ================= TITLE =================
+        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+        Paragraph title = new Paragraph("Complaints Analytics Report", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         document.add(title);
+        document.add(new Paragraph(" "));
 
+        // ================= FETCH DATA =================
+        List<Complaints> complaints =
+                ComplaintsByFilter(startDate, endDate, statusType, categoryType, urgencyType);
+
+        // ================= STATISTICS =================
+        Map<CategoryType, Long> categoryStats =
+                complaints.stream().collect(Collectors.groupingBy(
+                        Complaints::getCategoryType, Collectors.counting()
+                ));
+
+        Map<UrgencyType, Long> urgencyStats =
+                complaints.stream().collect(Collectors.groupingBy(
+                        Complaints::getUrgencyType, Collectors.counting()
+                ));
+
+        Map<StatusType, Long> statusStats =
+                complaints.stream().collect(Collectors.groupingBy(
+                        Complaints::getStatusType, Collectors.counting()
+                ));
+
+        // ================= STAT TABLE =================
+        Font sectionFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
+        document.add(new Paragraph("Complaint Statistics", sectionFont));
+        document.add(new Paragraph(" "));
+
+        PdfPTable statsTable = new PdfPTable(3);
+        statsTable.setWidthPercentage(100);
+        statsTable.addCell("Type");
+        statsTable.addCell("Value");
+        statsTable.addCell("Count");
+
+        categoryStats.forEach((k, v) -> {
+            statsTable.addCell("Category");
+            statsTable.addCell(k.name());
+            statsTable.addCell(v.toString());
+        });
+
+        urgencyStats.forEach((k, v) -> {
+            statsTable.addCell("Urgency");
+            statsTable.addCell(k.name());
+            statsTable.addCell(v.toString());
+        });
+
+        statusStats.forEach((k, v) -> {
+            statsTable.addCell("Status");
+            statsTable.addCell(k.name());
+            statsTable.addCell(v.toString());
+        });
+
+        document.add(statsTable);
+        document.add(new Paragraph(" "));
+
+        // ================= CHARTS =================
+        document.add(new Paragraph("Visual Analytics", sectionFont));
+        document.add(new Paragraph(" "));
+
+        Image categoryPie = Image.getInstance(
+                ConstantUtil.createPieChart("Complaints by Category", categoryStats)
+        );
+        categoryPie.scaleToFit(400, 300);
+        document.add(categoryPie);
+
+        Image statusBar = Image.getInstance(
+                ConstantUtil.createBarChart("Complaints by Status", statusStats)
+        );
+        statusBar.scaleToFit(400, 300);
+        document.add(statusBar);
+
+        // ================= COMPLAINT TABLE =================
+        document.add(new Paragraph("Complaint Details", sectionFont));
         document.add(new Paragraph(" "));
 
         PdfPTable table = new PdfPTable(6);
@@ -223,18 +434,17 @@ public class ComplaintsService {
         table.addCell("Urgency");
         table.addCell("Created At");
 
-        List<Complaints> complaints = ComplaintsByFilter(startDate,endDate,statusType,categoryType);
-
         for (Complaints c : complaints) {
             table.addCell(String.valueOf(c.getComplaintsId()));
-            table.addCell(String.valueOf(c.getCategoryType()));
-            table.addCell(String.valueOf(c.getStatusType()));
+            table.addCell(c.getCategoryType().name());
+            table.addCell(c.getStatusType().name());
             table.addCell(c.getDescription());
-            table.addCell(String.valueOf(c.getUrgencyType()));
-            table.addCell(String.valueOf(c.getCreatedAt()));
+            table.addCell(c.getUrgencyType().name());
+            table.addCell(c.getCreatedAt().toString());
         }
 
         document.add(table);
         document.close();
     }
+
 }
