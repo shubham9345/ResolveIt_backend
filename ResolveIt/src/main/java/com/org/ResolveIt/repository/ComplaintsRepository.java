@@ -10,4 +10,5 @@ import java.util.List;
 public interface ComplaintsRepository extends JpaRepository<Complaints,Long> {
     List<Complaints> findByUserId(Long userId);
     List<Complaints> findByCategoryType(CategoryType categoryType);
+    Complaints findByComplaintsId(Long complainId);
 }

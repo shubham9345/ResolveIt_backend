@@ -1,4 +1,5 @@
 # ResolveIt
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ## Installation Steps
 ```
 Git clone https://github.com/shubham9345/ResolveIt_backend.git

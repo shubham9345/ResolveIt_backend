@@ -9,7 +9,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClientException;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -34,6 +37,11 @@ public class ComplaintsController {
     }
 
     @GetMapping("/all-complaints/{userId}")
+    @Retryable(
+            value = { RestClientException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 2000)
+    )
     public List<Complaints> allComplaintsByUserId(@PathVariable Long userId) {
         return complaintsService.allComplaintByUserId(userId);
     }
@@ -41,6 +49,11 @@ public class ComplaintsController {
     @GetMapping("/all-anonymous")
     public List<Complaints> allanonymousComplaints() {
         return complaintsService.allAnonymousComplaints();
+    }
+    @GetMapping("/complain/{complainId}")
+
+    public Complaints findcomplainBycomplainId(@PathVariable Long complainId){
+        return complaintsService.findByComplaintd(complainId);
     }
 
     @GetMapping("/complaint-category")

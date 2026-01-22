@@ -1,5 +1,6 @@
 package com.org.ResolveIt.service;
 
+import com.org.ResolveIt.Exception.ComplaintNotFoundException;
 import com.org.ResolveIt.Exception.UserNotFoundException;
 import com.org.ResolveIt.model.*;
 import com.org.ResolveIt.repository.CommentRepository;
@@ -63,6 +64,13 @@ public class ComplaintsService {
 
     public List<Complaints> allComplaintByUserId(Long userId) {
         return complaintsRepository.findByUserId(userId);
+    }
+    public Complaints findByComplaintd(Long complainId){
+        Complaints complaints = complaintsRepository.findByComplaintsId(complainId);
+        if(complaints == null){
+            throw new ComplaintNotFoundException("complain not found with this complain Id");
+        }
+        return complaints;
     }
 
     public List<Complaints> allAnonymousComplaints() {
