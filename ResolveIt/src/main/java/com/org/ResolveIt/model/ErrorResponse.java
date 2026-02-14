@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 public class ErrorResponse {
     private LocalDateTime timestamp;
     private String message;
-    private String details;
     private int status;
     private String path;
 
@@ -20,7 +19,6 @@ public class ErrorResponse {
         super();
         this.timestamp = timestamp;
         this.message = message;
-        this.details = details;
         this.status = status;
         this.path = path;
     }
